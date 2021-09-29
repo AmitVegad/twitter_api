@@ -137,7 +137,7 @@ exports.unlike = async (req, res) => {
           unlikedTweet
         );
       }else{
-        res.successResponse(res, "Already unliked");
+        response.successResponse(res, "Already unliked");
       }
     }
   } catch (err) {
