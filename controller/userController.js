@@ -82,6 +82,7 @@ exports.register = async (req, res) => {
           password,
         });
 
+        // convert password in to crypted form
         bcrypt.genSalt(10, (err, salt) => {
           bcrypt.hash(newUser.password, salt, (err, hash) => {
             if (err) throw err;
@@ -117,13 +118,12 @@ exports.auth = (req, res, next) => {
       response.unauthorizedResponse(res, "session expeired please login again");
     } else {
       req.body.userId = decoded.userId;
-      console.log(decoded.userId);
-      console.log(req.body);
       next();
     }
   });
 };
 
+// login
 exports.login = (req, res) => {
   let { username, password } = req.body;
 
@@ -146,7 +146,7 @@ exports.login = (req, res) => {
             { userId: user._id, username },
             process.env.TOKEN_KEY,
             {
-              expiresIn: "2m",
+              expiresIn: "3m",
             }
           );
 
@@ -178,12 +178,13 @@ exports.follow = async (req, res) => {
     if(!user){
       response.ErrorResponse(res, "User not Found");
     }else{
+      // add to followedUser followers list
       if (!user.followers.includes(userId)) {
         user.followers.push(userId);
-
         await user.save();
         let mainUser = await User.findOne({ _id: userId });
 
+        // add to userId following list
         if (!mainUser.following.includes(followedUser)) {
           mainUser.following.push(followedUser);
           await mainUser.save();
@@ -211,6 +212,7 @@ exports.unfollow = async (req, res) => {
     if(!user){
       response.ErrorResponse(res, "user not found");
     }else{
+      // remove user from userId following list 
       if (user.following.includes(unFollowUserId)) {
         user.following.splice(user.following.indexOf(unFollowUserId), 1);
         await user.save();
@@ -219,6 +221,7 @@ exports.unfollow = async (req, res) => {
         if(!mainUser){
           response.ErrorResponse(res, "user not found");
         }else{
+          // remove user from unFollowUserId followers list
           if (mainUser.followers.includes(userId)) {
             mainUser.followers.splice(user.followers.indexOf(userId), 1);
             await mainUser.save();

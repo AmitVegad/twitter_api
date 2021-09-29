@@ -24,10 +24,10 @@ exports.create = async (req, res) => {
   const image = req.file.filename;
   console.log(userId);
   try {
+    // validate tweet data
     if (!description && !image) {
       response.ErrorResponse(res, "Please provide a description or image");
     }else{
-      console.log(userId);
       const tweet = new Tweet({
         userId: userId,
         description,
