@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 // connect database
-mongoose.connect('mongodb://localhost:27017/flipkart',{ useNewUrlParser: true});
+// mongoose.connect('mongodb://localhost:27017/flipkart',{ useNewUrlParser: true});
 
 // user schema
 const userSchema = new mongoose.Schema({
@@ -18,6 +18,10 @@ const userSchema = new mongoose.Schema({
         default: true,
     },
     followers:{
+        type:Array,
+        default: [],
+    },
+    following:{
         type:Array,
         default: [],
     },

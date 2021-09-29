@@ -7,10 +7,10 @@ const userController = require('../controller/userController');
 router.post('/create',userController.auth, tweetController.upload, tweetController.create);
 
 // get single tweet
-router.post('/read' ,userController.auth, tweetController.read);
+router.get('/get/:tweetId' ,userController.auth, tweetController.read);
 
 // delete tweet
-router.post('/delete', userController.auth, tweetController.delete);
+router.delete('/delete/:tweetId', userController.auth, tweetController.delete);
 
 // get all tweets
 router.get('/alltweets', userController.auth, tweetController.allTweets);

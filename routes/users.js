@@ -10,7 +10,7 @@ router.post('/', function(req, res, next) {
 });
 
 // register new user
-router.post('/register', userController.reg);
+router.post('/register', userController.register);
 
 // login user
 router.post('/login', userController.login);

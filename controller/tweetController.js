@@ -19,116 +19,128 @@ exports.upload = multer({
 }).single("image");
 
 // craete new tweet
-exports.create = (req, res) => {
+exports.create = async (req, res) => {
   const { userId, description } = req.body;
   const image = req.file.filename;
-
-  // validate tweet
-  if(!description && !image) {
+  console.log(userId);
+  try {
+    if (!description && !image) {
       response.ErrorResponse(res, "Please provide a description or image");
-  }
-
-  User.findOne({ _id: userId }).then((user) => {
-    if (!user) {
-      response.ErrorResponse(res, "User not found");
-    } else {
+    }else{
+      console.log(userId);
       const tweet = new Tweet({
-        userId,
+        userId: userId,
         description,
         image,
       });
-
-      tweet.save((err, tweetData) => {
-        if (err) {
-          response.ErrorResponse(res, "something went wrong");
-        } else {
-          response.successResponseWithData(
-            res,
-            "tweeted successfully",
-            tweetData
-          );
-        }
-      });
+      await tweet.save()
+      response.successResponseWithData(
+        res,
+        "tweeted successfully",
+        tweet
+      );
     }
-  });
+  } catch (err) {
+      response.ErrorResponse(res, err.message);
+  }
 };
 
 //delete tweet
-exports.delete = (req, res) => {
-  const { tweetId } = req.body;
-
-  Tweet.findByIdAndDelete(tweetId, (err, tweetData) => {
-    if (err) {
-      response.ErrorResponse(res, "Something went wrong");
-    }
-    response.successResponseWithData(res, "deleted successfully", tweetData);
-  });
+exports.delete = async (req, res) => {
+  const { tweetId } = req.params;
+  try {
+      let tweetData = await Tweet.findByIdAndDelete(tweetId);
+      response.successResponseWithData(res, "deleted successfully", tweetData);
+  } catch (err) {
+      response.ErrorResponse(res, err.message);
+  }
 };
 
 // get single tweet
-exports.read = (req, res) => {
-  const { tweetId } = req.body;
-
-  Tweet.findOne({ _id: tweetId }, (err, tweetData) => {
-    if (err) {
-      response.ErrorResponse(res, "something went wrong");
+exports.read = async (req, res) => {
+  const { tweetId } = req.params;
+  try {
+    let tweet = await Tweet.findOne({ _id: tweetId });
+    if(!tweet){
+      response.ErrorResponse(res, "tweet not found");
+    }else{
+      response.successResponseWithData(
+        res,
+        "fetched tweet successfully",
+        tweet
+      );
     }
-    response.successResponseWithData(
-      res,
-      "fetched tweet successfully",
-      tweetData
-    );
-  });
+  } catch (err) {
+    response.ErrorResponse(res, err.message)
+  }
+  
 };
 
 // get all tweets
-exports.allTweets = (req, res) => {
-  Tweet.find({}, (err, tweets) => {
-    if (err) response.ErrorResponse(res, "something went wrong");
-    response.successResponseWithData(res, "fetched tweet successfully", tweets);
-  })
-    .sort({ createdAt: -1 })
-    .limit(10);
+exports.allTweets = async (req, res) => {
+
+  try {
+      let tweets = await Tweet.find({}).sort({ createdAt: -1 });
+      if(!tweets){
+        response.ErrorResponse(res, "something want wrong")
+      }else{
+        response.successResponseWithData(res, "fetched tweet successfully", tweets);
+      }
+  } catch (err) {
+    response.ErrorResponse(res, error.message)
+  }
 };
 
 // likes tweet
-exports.like = (req, res) => {
-    
+exports.like = async (req, res) => {
   const { tweetId, userId } = req.body;
 
-  Tweet.findOne({ _id: tweetId }, (err, tweet) => {
-    if (err) {
-      response.ErrorResponse(res, "something went wrong");
-    }
-    tweet.likeCount++;
-    tweet.likes.push(userId);
-
-    tweet.save((error, tweetData) => {
-      if (error) {
-        response.ErrorResponse(res, "something went wrong");
+  try {
+      let tweet = await Tweet.findOne({ _id: tweetId });
+      if(!tweet){
+        response.ErrorResponse(res, "tweet not found");
+      }else{
+        if (!tweet.likes.includes(userId)) {
+          tweet.likeCount++;
+          tweet.likes.push(userId);
+          let likedtweet = await tweet.save();
+          response.successResponseWithData(
+            res,
+            "liked successfully",
+            likedtweet
+          );
+        }else{
+          response.successResponse(res, "Already liked tweet")
+        }
       }
-      response.successResponseWithData(res, "liked successfully", tweetData);
-    });
-  });
+  } catch (err) {
+      response.ErrorResponse(res, err.message);
+  }
 };
 
 // unlike tweet
-exports.unlike = (req, res) => {
+exports.unlike = async (req, res) => {
   const { tweetId, userId } = req.body;
 
-  Tweet.findOne({ _id: tweetId }, (err, tweet) => {
-    if (err) {
-      response.ErrorResponse(res, "something went wrong");
-    }
-    tweet.likeCount--;
-    tweet.likes.splice(tweet.likes.indexOf(userId), 1);
-
-    tweet.save((error, tweetData) => {
-      if (error) {
-        response.ErrorResponse(res, "something went wrong");
+  try {
+    let tweet  = await Tweet.findOne({ _id: tweetId });
+    if(!tweet){
+      response.ErrorResponse(res, "tweet not found");
+    }else{
+      if (tweet.likes.includes(userId)) {
+        tweet.likeCount--;
+        tweet.likes.splice(tweet.likes.indexOf(userId), 1);
+        let unlikedTweet = await tweet.save();
+        response.successResponseWithData(
+          res,
+          "unliked successfully",
+          unlikedTweet
+        );
+      }else{
+        res.successResponse(res, "Already unliked");
       }
-      response.successResponseWithData(res, "unliked successfully", tweetData);
-    });
-  });
+    }
+  } catch (err) {
+    response.ErrorResponse(res, err.message);
+  }
 };
-

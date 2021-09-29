@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 // connect database
-mongoose.connect('mongodb://localhost:27017/flipkart',{ useNewUrlParser: true});
+// mongoose.connect('mongodb://localhost:27017/flipkart',{ useNewUrlParser: true});
 
 // tweer schema
 const tweetSchema = new mongoose.Schema({

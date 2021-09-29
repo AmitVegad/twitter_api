@@ -24,65 +24,64 @@ schema
   .not()
   .spaces(); // Should not have spaces
 
-exports.reg = (req, res) => {
+//register
+exports.register = async (req, res) => {
   const { username, password, password2 } = req.body;
+  try {
+    let errors = [];
 
-  let errors = [];
+    if (!username || !password || !password2) {
+      errors.push({ message: "Please enter all fields" });
+    }
 
-  if (!username || !password || !password2) {
-    errors.push({ msg: "Please enter all fields" });
-  }
+    // validation password
+    const validateError = schema.validate(password, { list: true });
 
-  // validation password
-  const validateError = schema.validate(password, { list: true });
+    if (validateError.length > 0) {
+      if (validateError.includes("min")) {
+        errors.push({ message: "password must be at least 6 characters long" });
+      }
+      if (validateError.includes("max")) {
+        errors.push({ message: "password must be max 16 characters long" });
+      }
+      if (validateError.includes("uppercase")) {
+        errors.push({ message: "password must have uppercase characters" });
+      }
+      if (validateError.includes("lowercase")) {
+        errors.push({ message: "password must have lowercase characters" });
+      }
+      if (validateError.includes("digits")) {
+        errors.push({ message: "password must have at least 2 digits" });
+      }
+      if (validateError.includes("symbols")) {
+        errors.push({ message: "password must have at least 1 synmbol" });
+      }
+      if (validateError.includes("spaces")) {
+        errors.push({ message: "password does not contain spaces" });
+      }
+    }
 
-  if (validateError.length > 0) {
-    if (validateError.includes("min")) {
-      errors.push({ msg: "password must be at least 6 characters long" });
+    if (password != password2) {
+      errors.push({ message: "Passwords do not match" });
     }
-    if (validateError.includes("max")) {
-      errors.push({ msg: "password must be max 16 characters long" });
-    }
-    if (validateError.includes("uppercase")) {
-      errors.push({ msg: "password must have uppercase characters" });
-    }
-    if (validateError.includes("lowercase")) {
-      errors.push({ msg: "password must have lowercase characters" });
-    }
-    if (validateError.includes("digits")) {
-      errors.push({ msg: "password must have at least 2 digits" });
-    }
-    if (validateError.includes("symbols")) {
-      errors.push({ msg: "password must have at least 1 synmbol" });
-    }
-    if (validateError.includes("spaces")) {
-      errors.push({ msg: "password does not contain spaces" });
-    }
-  }
 
-  if (password != password2) {
-    errors.push({ msg: "Passwords do not match" });
-  }
-
-  if (errors.length > 0) {
-    response.validationErrorWithData(res, errors, {
-      username: username,
-      password: password,
-      password2: password2,
-    });
-  } else {
-
-    //check username already exit or not
-    User.findOne({ username: username }).then((user) => {
-      if (user) {
+    if (errors.length > 0) {
+      response.validationErrorWithData(res, errors, {
+        username: username,
+        password: password,
+        password2: password2,
+      });
+    } else {
+      //check username already exit or not
+      let user = await User.findOne({ username: username });
+      if(user){
         response.ErrorResponse(res, "Username already exists");
-      } else {
+      }else{
         const newUser = new User({
           username,
           password,
         });
 
-        //convert original form of password to crypted 
         bcrypt.genSalt(10, (err, salt) => {
           bcrypt.hash(newUser.password, salt, (err, hash) => {
             if (err) throw err;
@@ -99,9 +98,13 @@ exports.reg = (req, res) => {
               .catch((err) => console.log(err));
           });
         });
+
       }
-    });
   }
+  } catch (err) {
+      response.ErrorResponse(res, err.message);
+  }
+  
 };
 
 // middleware: check for every req to user auth token is valid or not
@@ -111,9 +114,11 @@ exports.auth = (req, res, next) => {
   //verify every req token is valid or not
   jwt.verify(Authentication, process.env.TOKEN_KEY, function (err, decoded) {
     if (err) {
-      res.send({ msg: "session expeired please login again" });
+      response.unauthorizedResponse(res, "session expeired please login again");
     } else {
       req.body.userId = decoded.userId;
+      console.log(decoded.userId);
+      console.log(req.body);
       next();
     }
   });
@@ -132,71 +137,105 @@ exports.login = (req, res) => {
 
     // Match password
     bcrypt.compare(password, user.password, (err, isMatch) => {
-      if (err) throw err;
-      if (isMatch) {
+      if (err) {
+        response.ErrorResponse(res, err.message)
+      }else{
+        if (isMatch) {
+          // Generating token of user is successfully authenicated
+          const token = jwt.sign(
+            { userId: user._id, username },
+            process.env.TOKEN_KEY,
+            {
+              expiresIn: "2m",
+            }
+          );
 
-        // Generating token of user is successfully authenicated
-        const token = jwt.sign(
-          { userId: user._id, username },
-          process.env.TOKEN_KEY,
-          {
-            expiresIn: "2m",
-          }
-        );
-        res.cookie("Authentication", token);
-        response.successResponse(res, "login successfully");
-      } else {
-        response.unauthorizedResponse(res, "Password incorrect");
+          //send token with cookies
+          res.cookie("Authentication", token);
+          response.successResponse(res, "login successfully");
+        } else {
+          response.unauthorizedResponse(res, "Password incorrect");
+        }
       }
     });
   });
 };
 
+// logout
 exports.logout = (req, res) => {
-
-  // on logout clear token 
+  // on logout clear token
   res.clearCookie("Authentication");
   response.successResponse(res, "logout successfully");
 };
 
-exports.follow = (req, res) => {
+// follow user
+exports.follow = async (req, res) => {
+  // userId: Which user try to follow someone----followedUser: to who following
+  const { userId, followedUser } = req.body;
+  try {
+    let user = await User.findOne({ _id: followedUser });
 
-  // userId: Which user you want to follow----byFollowUserId: who will perform action
-  const { userId, byFollowUserId } = req.body;
+    if(!user){
+      response.ErrorResponse(res, "User not Found");
+    }else{
+      if (!user.followers.includes(userId)) {
+        user.followers.push(userId);
 
-  User.findOne({ _id: userId }).then((user) => {
-    if (!user) {
-      response.ErrorResponse(res, "something wrong");
+        await user.save();
+        let mainUser = await User.findOne({ _id: userId });
+
+        if (!mainUser.following.includes(followedUser)) {
+          mainUser.following.push(followedUser);
+          await mainUser.save();
+          response.successResponse(
+            res,
+            "Successfully followed"
+          );
+        }
+
+      }else{
+        response.ErrorResponse(res, "User already followed")
+      }
     }
-
-    // check user already follow or not
-    if (!user.followers.includes(byFollowUserId)) {
-      user.followers.push(byFollowUserId);
-      user.save().then((user) => {
-        response.successResponseWithData(res, "Successfully followed", user);
-      });
-    }
-    response.successResponseWithData(res, "Successfully followed", user);
-  });
+  } catch (err) {
+    response.ErrorResponse(res, err.message);
+  }
 };
 
-exports.unfollow = (req, res) => {
+//unfollow user
+exports.unfollow = async (req, res) => {
+  // userId: who want to unfollow----unFollowUserId: to who unfollow
+  const { userId, unFollowUserId } = req.body;
+  try{
+    let user = await User.findOne({ _id: userId });
+    if(!user){
+      response.ErrorResponse(res, "user not found");
+    }else{
+      if (user.following.includes(unFollowUserId)) {
+        user.following.splice(user.following.indexOf(unFollowUserId), 1);
+        await user.save();
 
-  // userId: Which user you want to unfollow----byFollowUserId: who will perform action
-  const { userId, byunFollowUserId } = req.body;
-
-  User.findOne({ _id: userId }).then((user) => {
-    if (!user) {
-      response.ErrorResponse(res, "something wrong");
+        let mainUser = await User.findOne({ _id: unFollowUserId });
+        if(!mainUser){
+          response.ErrorResponse(res, "user not found");
+        }else{
+          if (mainUser.followers.includes(userId)) {
+            mainUser.followers.splice(user.followers.indexOf(userId), 1);
+            await mainUser.save();
+            response.successResponse(
+              res,
+              "Successfully unfollowed"
+            );
+          }
+        }
+      }else{
+        response.successResponse(
+          res,
+          "You are not following this user"
+        );
+      }
     }
-
-    // cheeck user followed or not
-    if (user.followers.includes(byunFollowUserId)) {
-      user.followers.splice(user.followers.indexOf(byunFollowUserId), 1);
-      user.save().then((user) => {
-        response.successResponseWithData(res, "Successfully unfollowed", user);
-      });
-    }
-    response.successResponseWithData(res, "Successfully unfollowed", user);
-  });
+  }catch(err){
+      response.ErrorResponse(res, err.message)
+  }
 };
